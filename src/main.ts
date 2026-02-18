@@ -84,15 +84,13 @@ function refresh(): void {
   renderSeriesList(seriesContainer, seriesList, activeId, {
     onRename: handleSeriesRename,
     onColorChange: handleSeriesColorChange,
-    onToggleVisibility: handleSeriesToggle,
-    onSetActive: handleSetActive,
+    onSelect: handleSeriesSelect,
     onRemove: handleSeriesRemove,
   });
 
   // Chart
-  const hasVisibleData = seriesList.some(s => s.visible && s.entries.length > 0);
-  if (hasVisibleData) {
-    renderChart(chartCanvas, seriesList, activeId, waypoints);
+  if (activeSeries && activeSeries.entries.length > 0) {
+    renderChart(chartCanvas, activeSeries, waypoints);
   } else {
     destroyChart();
   }
@@ -185,16 +183,7 @@ function handleSeriesColorChange(id: string, color: string): void {
   }
 }
 
-function handleSeriesToggle(id: string): void {
-  const seriesList = getAllSeries();
-  const s = seriesList.find(s => s.id === id);
-  if (s) {
-    updateSeries({ ...s, visible: !s.visible });
-    refresh();
-  }
-}
-
-function handleSetActive(id: string): void {
+function handleSeriesSelect(id: string): void {
   setActiveSeriesId(id);
   refresh();
 }

@@ -36,9 +36,9 @@ const COLORS = {
 };
 
 const TREND_COLORS = {
-  rising: '#44ff44',
-  falling: '#ff4444',
-  flat: 'rgba(242, 239, 230, 0.45)',
+  rising: '#ff6b6b',
+  falling: '#69ff69',
+  flat: 'rgba(242, 239, 230, 0.55)',
 };
 
 /**
@@ -64,8 +64,7 @@ function hexToRgba(hex: string, alpha: number): string {
 
 export function renderChart(
   canvas: HTMLCanvasElement,
-  seriesList: Series[],
-  activeSeriesId: string | null,
+  series: Series,
   waypoints: Waypoint[],
 ): void {
   if (chartInstance) {
@@ -73,134 +72,105 @@ export function renderChart(
     chartInstance = null;
   }
 
-  const visibleSeries = seriesList.filter(s => s.visible);
-  if (visibleSeries.length === 0) return;
+  if (series.entries.length === 0) return;
 
-  // Build a unified date label axis from all visible series
-  const allDatesSet = new Set<string>();
-  for (const s of visibleSeries) {
-    for (const e of s.entries) allDatesSet.add(e.date);
-  }
-  const labels = Array.from(allDatesSet).sort();
+  const labels = series.entries.map(e => e.date);
   const totalDays = labels.length;
 
   // Create a date-to-index map
   const dateIndex = new Map<string, number>();
   labels.forEach((d, i) => dateIndex.set(d, i));
 
-  const activeSeries = seriesList.find(s => s.id === activeSeriesId && s.visible) ?? null;
-
   // ── Build datasets ──────────────────────────────────────────
 
   const datasets: any[] = [];
 
-  // One dataset per visible series
-  for (const s of visibleSeries) {
-    const data: (number | null)[] = new Array(labels.length).fill(null);
-    for (const e of s.entries) {
-      const idx = dateIndex.get(e.date);
-      if (idx !== undefined) data[idx] = e.score;
-    }
+  // Main series line
+  const data = series.entries.map(e => e.score);
 
-    const isActive = s.id === activeSeriesId;
+  datasets.push({
+    label: series.name,
+    data,
+    borderColor: series.color,
+    backgroundColor: hexToRgba(series.color, 0.12),
+    borderWidth: 1.5,
+    pointRadius: series.entries.length > 90 ? 0 : 2,
+    pointHoverRadius: 4,
+    fill: true,
+    tension: 0.2,
+    order: 3,
+    spanGaps: false,
+  });
+
+  // Moving averages
+  const ma7 = movingAverage(series.entries, 7);
+  const ma30 = movingAverage(series.entries, 30);
+
+  const ma7Color = lightenColor(series.color, 0.3);
+  const ma30Color = lightenColor(series.color, 0.5);
+
+  datasets.push(
+    {
+      label: '7-Day Avg',
+      data: ma7,
+      borderColor: ma7Color,
+      borderWidth: 2,
+      pointRadius: 0,
+      pointHoverRadius: 3,
+      fill: false,
+      tension: 0.3,
+      order: 2,
+      spanGaps: false,
+    },
+    {
+      label: '30-Day Avg',
+      data: ma30,
+      borderColor: ma30Color,
+      borderWidth: 2,
+      pointRadius: 0,
+      pointHoverRadius: 3,
+      fill: false,
+      tension: 0.3,
+      borderDash: [4, 2],
+      order: 1,
+      spanGaps: false,
+    },
+  );
+
+  // Per-segment trendlines
+  const segments = buildSegments(series.entries, waypoints);
+  for (let si = 0; si < segments.length; si++) {
+    const seg = segments[si];
+    if (seg.entries.length < 2) continue;
+
+    const segScores = seg.entries.map(e => e.score);
+    const { slope, intercept } = linearRegression(segScores);
+    const yStart = intercept;
+    const yEnd = intercept + slope * (segScores.length - 1);
+
+    const trendData: (number | null)[] = new Array(labels.length).fill(null);
+    const startIdx = dateIndex.get(seg.entries[0].date);
+    const endIdx = dateIndex.get(seg.entries[seg.entries.length - 1].date);
+    if (startIdx !== undefined) trendData[startIdx] = yStart;
+    if (endIdx !== undefined) trendData[endIdx] = yEnd;
+
+    const trendColor = Math.abs(slope) < 0.01 ? TREND_COLORS.flat
+      : slope > 0 ? TREND_COLORS.rising : TREND_COLORS.falling;
 
     datasets.push({
-      label: s.name,
-      data,
-      borderColor: s.color,
-      backgroundColor: hexToRgba(s.color, 0.12),
-      borderWidth: isActive ? 1.5 : 1,
-      pointRadius: s.entries.length > 90 ? 0 : (isActive ? 2 : 1),
-      pointHoverRadius: 4,
-      fill: isActive && visibleSeries.length === 1,
-      tension: 0.2,
-      order: isActive ? 3 : 4,
-      spanGaps: false,
+      label: si === 0 ? 'Trend' : '',
+      data: trendData,
+      borderColor: trendColor,
+      borderWidth: 2,
+      borderDash: [8, 4],
+      pointRadius: 0,
+      pointHoverRadius: 0,
+      fill: false,
+      tension: 0,
+      spanGaps: true,
+      order: 0,
+      isTrendline: true,
     });
-  }
-
-  // MAs and trendlines only for the active series
-  if (activeSeries) {
-    const ma7 = movingAverage(activeSeries.entries, 7);
-    const ma30 = movingAverage(activeSeries.entries, 30);
-
-    // Map MA values onto the unified label axis
-    const ma7Data: (number | null)[] = new Array(labels.length).fill(null);
-    const ma30Data: (number | null)[] = new Array(labels.length).fill(null);
-    activeSeries.entries.forEach((e, i) => {
-      const idx = dateIndex.get(e.date);
-      if (idx !== undefined) {
-        ma7Data[idx] = ma7[i];
-        ma30Data[idx] = ma30[i];
-      }
-    });
-
-    const ma7Color = lightenColor(activeSeries.color, 0.3);
-    const ma30Color = lightenColor(activeSeries.color, 0.5);
-
-    datasets.push(
-      {
-        label: '7-Day Avg',
-        data: ma7Data,
-        borderColor: ma7Color,
-        borderWidth: 2,
-        pointRadius: 0,
-        pointHoverRadius: 3,
-        fill: false,
-        tension: 0.3,
-        order: 2,
-        spanGaps: false,
-      },
-      {
-        label: '30-Day Avg',
-        data: ma30Data,
-        borderColor: ma30Color,
-        borderWidth: 2,
-        pointRadius: 0,
-        pointHoverRadius: 3,
-        fill: false,
-        tension: 0.3,
-        borderDash: [4, 2],
-        order: 1,
-        spanGaps: false,
-      },
-    );
-
-    // Per-segment trendlines for active series
-    const segments = buildSegments(activeSeries.entries, waypoints);
-    for (let si = 0; si < segments.length; si++) {
-      const seg = segments[si];
-      if (seg.entries.length < 2) continue;
-
-      const segScores = seg.entries.map(e => e.score);
-      const { slope, intercept } = linearRegression(segScores);
-      const yStart = intercept;
-      const yEnd = intercept + slope * (segScores.length - 1);
-
-      const trendData: (number | null)[] = new Array(labels.length).fill(null);
-      const startIdx = dateIndex.get(seg.entries[0].date);
-      const endIdx = dateIndex.get(seg.entries[seg.entries.length - 1].date);
-      if (startIdx !== undefined) trendData[startIdx] = yStart;
-      if (endIdx !== undefined) trendData[endIdx] = yEnd;
-
-      const trendColor = Math.abs(slope) < 0.01 ? TREND_COLORS.flat
-        : slope > 0 ? TREND_COLORS.rising : TREND_COLORS.falling;
-
-      datasets.push({
-        label: si === 0 ? 'Trend' : '',
-        data: trendData,
-        borderColor: trendColor,
-        borderWidth: 2,
-        borderDash: [8, 4],
-        pointRadius: 0,
-        pointHoverRadius: 0,
-        fill: false,
-        tension: 0,
-        spanGaps: true,
-        order: 0,
-        isTrendline: true,
-      });
-    }
   }
 
   // ── Build waypoint annotations ──────────────────────────────
