@@ -36,7 +36,6 @@
   font-family: var(--font-body);
   line-height: 1.5;
   color: var(--text-primary);
-  background-color: var(--bg-deep);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -49,15 +48,54 @@
   box-sizing: border-box;
 }
 
+html {
+  background-color: var(--bg-deep);
+}
+
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: var(--bg-deep);
+  background-color: transparent;
+  overflow-x: hidden;
+}
+
+/* ── Animated forest background (Ken Burns) ─────────────────────── */
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: -10%;           /* oversized so zoom/pan doesn't reveal edges */
+  width: 120%;
+  height: 120%;
+  z-index: -1;
   background-image: url('/forest-bg.jpg');
   background-size: cover;
   background-position: center top;
-  background-attachment: fixed;
   background-repeat: no-repeat;
+  transition: transform 2s ease-in-out;
+  will-change: transform;
+}
+
+body.ambient-playing::after {
+  animation: kenBurns 50s ease-in-out infinite alternate;
+}
+
+@keyframes kenBurns {
+  0% {
+    transform: scale(1) translate(0, 0);
+  }
+  25% {
+    transform: scale(1.06) translate(-1.5%, 1%);
+  }
+  50% {
+    transform: scale(1.03) translate(1%, -0.5%);
+  }
+  75% {
+    transform: scale(1.08) translate(-0.5%, -1%);
+  }
+  100% {
+    transform: scale(1.05) translate(1.5%, 0.5%);
+  }
 }
 
 body::before {
@@ -889,6 +927,59 @@ body::before {
 
 .photo-credit a:hover {
   color: var(--text-secondary);
+}
+
+/* ── Ambient Audio Toggle ───────────────────────────────────── */
+
+.ambient-toggle {
+  position: fixed;
+  bottom: 1.2rem;
+  right: 1.2rem;
+  z-index: 100;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+
+.ambient-toggle:hover {
+  color: var(--accent-green);
+  border-color: var(--accent-green);
+  background: rgba(106, 191, 105, 0.12);
+  transform: scale(1.08);
+}
+
+.ambient-toggle.playing {
+  color: var(--accent-green);
+  border-color: var(--accent-green);
+  box-shadow: 0 0 12px rgba(126, 216, 126, 0.25), 0 2px 12px rgba(0, 0, 0, 0.3);
+  animation: ambientPulse 3s ease-in-out infinite;
+}
+
+.ambient-toggle.playing .ambient-icon {
+  animation: leafSway 2.5s ease-in-out infinite;
+  transform-origin: center bottom;
+}
+
+@keyframes ambientPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(126, 216, 126, 0.15), 0 2px 12px rgba(0, 0, 0, 0.3); }
+  50% { box-shadow: 0 0 18px rgba(126, 216, 126, 0.35), 0 2px 12px rgba(0, 0, 0, 0.3); }
+}
+
+@keyframes leafSway {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(6deg); }
+  75% { transform: rotate(-6deg); }
 }
 
 /* ── Responsive ──────────────────────────────────────────────── */

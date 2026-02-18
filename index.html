@@ -84,6 +84,18 @@
         </footer>
       </div>
     </div>
+    <!-- Ambient audio -->
+    <audio id="forest-audio" loop preload="none">
+      <source src="/audiopapkin-forest-ambience-296528.mp3" type="audio/mpeg" />
+    </audio>
+    <button id="btn-ambient" class="ambient-toggle" aria-label="Toggle forest ambience" title="Toggle forest ambience">
+      <svg class="ambient-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22V10"></path>
+        <path d="M12 10C12 10 8 8 8 4.5C8 2 10 1 12 3C14 1 16 2 16 4.5C16 8 12 10 12 10Z"></path>
+        <path d="M9 18c-2 0-4-1-4-3.5S7 10 12 10"></path>
+        <path d="M15 18c2 0 4-1 4-3.5S17 10 12 10"></path>
+      </svg>
+    </button>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

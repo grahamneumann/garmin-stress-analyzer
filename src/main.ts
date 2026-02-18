@@ -298,3 +298,56 @@ document.addEventListener('drop', (e) => {
 // ── Init ─────────────────────────────────────────────────────────
 
 refresh();
+
+// ── Ambient audio ────────────────────────────────────────────────
+
+const forestAudio = document.getElementById('forest-audio') as HTMLAudioElement;
+const ambientBtn = document.getElementById('btn-ambient') as HTMLButtonElement;
+
+const FADE_DURATION = 1500; // ms
+const TARGET_VOLUME = 0.35;
+
+function fadeAudio(audio: HTMLAudioElement, from: number, to: number, duration: number): Promise<void> {
+  return new Promise(resolve => {
+    const steps = 30;
+    const stepTime = duration / steps;
+    const delta = (to - from) / steps;
+    let current = from;
+    let step = 0;
+    audio.volume = from;
+
+    const interval = setInterval(() => {
+      step++;
+      current += delta;
+      audio.volume = Math.max(0, Math.min(1, current));
+      if (step >= steps) {
+        clearInterval(interval);
+        audio.volume = to;
+        resolve();
+      }
+    }, stepTime);
+  });
+}
+
+function setAmbientState(playing: boolean): void {
+  if (playing) {
+    ambientBtn.classList.add('playing');
+    document.body.classList.add('ambient-playing');
+  } else {
+    ambientBtn.classList.remove('playing');
+    document.body.classList.remove('ambient-playing');
+  }
+}
+
+ambientBtn.addEventListener('click', async () => {
+  if (forestAudio.paused) {
+    forestAudio.volume = 0;
+    await forestAudio.play();
+    setAmbientState(true);
+    fadeAudio(forestAudio, 0, TARGET_VOLUME, FADE_DURATION);
+  } else {
+    setAmbientState(false);
+    await fadeAudio(forestAudio, forestAudio.volume, 0, FADE_DURATION);
+    forestAudio.pause();
+  }
+});
